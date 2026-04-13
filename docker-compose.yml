@@ -1,64 +1,86 @@
 version: "3.9"
 
+# ─────────────────────────────────────────────────────────────
+# Scartrack Platform — Docker Compose (VPS Production Ready)
+#
+# Usage:
+#   cp .env.example .env   # configure your variables
+#   docker compose up --build -d
+#   docker compose logs -f app
+# ─────────────────────────────────────────────────────────────
+
 services:
+
+  # ── PostgreSQL 16 + PostGIS ──────────────────────────────
   db:
     image: postgis/postgis:16-3.4-alpine
     container_name: scartrack_db
     restart: unless-stopped
+    env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-scartrack}
+      POSTGRES_USER:     ${POSTGRES_USER:-scartrack}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scartrack123}
-      POSTGRES_DB: ${POSTGRES_DB:-scartrackdb}
+      POSTGRES_DB:       ${POSTGRES_DB:-scartrackdb}
+      PGDATA:            /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # bind only to localhost — not exposed publicly
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-scartrack} -d ${POSTGRES_DB:-scartrackdb}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
+    networks:
+      - scartrack_net
 
+  # ── Next.js App (production) ─────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_ vars baked into client bundle at build time
+        NEXT_PUBLIC_MAPBOX_TOKEN:  ${NEXT_PUBLIC_MAPBOX_TOKEN}
+        NEXT_PUBLIC_APP_URL:       ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_APP_NAME:      ${NEXT_PUBLIC_APP_NAME:-Scartrack Platform}
     container_name: scartrack_app
     restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV:          production
+      DATABASE_URL:      postgresql://${POSTGRES_USER:-scartrack}:${POSTGRES_PASSWORD:-scartrack123}@db:5432/${POSTGRES_DB:-scartrackdb}?schema=public
+      NEXTAUTH_SECRET:   ${NEXTAUTH_SECRET:-change_me_in_production_min_32_chars}
+      NEXTAUTH_URL:      ${NEXTAUTH_URL:-http://localhost:3000}
+      SOCKET_PORT:       ${SOCKET_PORT:-3001}
+      PORT:              3000
+      HOSTNAME:          0.0.0.0
     ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-scartrack}:${POSTGRES_PASSWORD:-scartrack123}@db:5432/${POSTGRES_DB:-scartrackdb}?schema=public
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-supersecretkey_change_in_production}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-YOUR_MAPBOX_TOKEN_HERE}
-      SOCKET_PORT: ${SOCKET_PORT:-3001}
-      NODE_ENV: production
+      - "0.0.0.0:3000:3000"   # exposed to all interfaces — accessible via VPS IP
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./.env:/app/.env:ro
-
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: scartrack_migrate
-    command: sh -c "npx prisma migrate deploy"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-scartrack}:${POSTGRES_PASSWORD:-scartrack123}@db:5432/${POSTGRES_DB:-scartrackdb}?schema=public
-    depends_on:
-      db:
-        condition: service_healthy
-    profiles:
-      - migrate
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - scartrack_net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  pgdata:
+  postgres_data:
     driver: local
 
 networks:
-  default:
+  scartrack_net:
+    driver: bridge
     name: scartrack_network

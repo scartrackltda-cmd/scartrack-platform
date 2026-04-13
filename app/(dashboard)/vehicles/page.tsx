@@ -4,11 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const VEHICLES = [
-  { id: "1", plate: "AA-00-BB", alias: "Caminhão 01", type: "TRUCK", brand: "Volvo", model: "FH 500", year: 2022, status: "moving", driver: "João Silva", speed: 67 },
-  { id: "2", plate: "CC-11-DD", alias: "Van Frota 03", type: "VAN", brand: "Mercedes", model: "Sprinter", year: 2021, status: "idle", driver: "Maria Costa", speed: 0 },
-  { id: "3", plate: "EE-22-FF", alias: "Carro 07", type: "CAR", brand: "Toyota", model: "Corolla", year: 2023, status: "online", driver: "Pedro Mota", speed: 92 },
-  { id: "4", plate: "GG-33-HH", alias: "Moto 02", type: "MOTORCYCLE", brand: "Honda", model: "CB 500", year: 2020, status: "alert", driver: "Ana Lima", speed: 0 },
-  { id: "5", plate: "II-44-JJ", alias: "Truck 05", type: "TRUCK", brand: "Scania", model: "R 450", year: 2019, status: "offline", driver: "—", speed: 0 },
+  { id: "1", plate: "ABC-1D23", alias: "Caminhão 01",  type: "TRUCK",      brand: "Volvo",   model: "FH 500",     year: 2022, status: "moving",  driver: "João Silva",    speed: 72 },
+  { id: "2", plate: "DEF-4E56", alias: "Van Frota 03", type: "VAN",        brand: "Mercedes",model: "Sprinter",   year: 2021, status: "idle",    driver: "Maria Costa",   speed: 0  },
+  { id: "3", plate: "GHI-7F89", alias: "Carro 07",     type: "CAR",        brand: "Toyota",  model: "Corolla",    year: 2023, status: "moving",  driver: "Pedro Mota",    speed: 98 },
+  { id: "4", plate: "JKL-2G34", alias: "Moto 02",      type: "MOTORCYCLE", brand: "Honda",   model: "CB 500",     year: 2020, status: "alert",   driver: "Ana Lima",      speed: 0  },
+  { id: "5", plate: "MNO-5H67", alias: "Bus 11",       type: "BUS",        brand: "Mercedes",model: "OF 1721",    year: 2021, status: "online",  driver: "Carlos Nunes",  speed: 55 },
+  { id: "6", plate: "PQR-8I90", alias: "Truck 05",     type: "TRUCK",      brand: "Scania",  model: "R 450",      year: 2019, status: "offline", driver: "—",             speed: 0  },
+  { id: "7", plate: "STU-1J12", alias: "Van 09",       type: "VAN",        brand: "Fiat",    model: "Ducato",     year: 2022, status: "moving",  driver: "Lucas Mendes",  speed: 43 },
+  { id: "8", plate: "VWX-4K34", alias: "Carro 12",     type: "CAR",        brand: "Chevrolet",model: "Onix",      year: 2023, status: "idle",    driver: "Fernanda Reis", speed: 0  },
 ];
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
