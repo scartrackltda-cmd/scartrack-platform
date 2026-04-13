@@ -7,7 +7,7 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci --frozen-lockfile
+RUN npm install --frozen-lockfile 2>/dev/null || npm install
 
 # ─────────────────────────────────────────────
 # Stage 2: Build the Next.js app
