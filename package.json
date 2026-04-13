@@ -15,6 +15,8 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@types/mapbox-gl": "^3.4.1",
+    "mapbox-gl": "^3.8.0",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-avatar": "^1.1.1",
     "@radix-ui/react-badge": "^1.0.0",
