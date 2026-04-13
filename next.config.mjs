@@ -3,10 +3,8 @@ const nextConfig = {
   // Standalone output — required for optimized Docker/VPS deployment
   output: "standalone",
 
-  experimental: {
-    // Keep Prisma server-side only (not bundled into client)
-    serverComponentsExternalPackages: ["@prisma/client", "prisma"],
-  },
+  // Keep Prisma server-side only (not bundled into client)
+  serverExternalPackages: ["@prisma/client", "prisma"],
 
   images: {
     remotePatterns: [
