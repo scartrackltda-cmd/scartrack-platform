@@ -58,7 +58,7 @@ services:
       PORT:              3000
       HOSTNAME:          0.0.0.0
     ports:
-      - "0.0.0.0:3000:3000"   # exposed to all interfaces — accessible via VPS IP
+      - "0.0.0.0:3002:3000"   # exposed to all interfaces — accessible via VPS IP:3002
     depends_on:
       db:
         condition: service_healthy
