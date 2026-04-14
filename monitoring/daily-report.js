@@ -8,123 +8,66 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const fs   = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
-const { promisify } = require('util');
+const http = require('http');
 const { alerts } = require('../notifications/notifier');
 
-const execAsync   = promisify(exec);
-const LOG_FILE    = path.join(__dirname, 'health.log');
+const LOG_FILE     = path.join(__dirname, 'health.log');
 const PENDING_FILE = path.join(__dirname, '../orchestrator/pending-actions.json');
+
+// Orchestrator host: try env var, then docker host gateway, then localhost
+const ORCHESTRATOR_HOST = process.env.ORCHESTRATOR_HOST || '172.16.0.1';
+const ORCHESTRATOR_PORT = process.env.ORCHESTRATOR_PORT || 3100;
+
+function fetchStatus() {
+  return new Promise((resolve) => {
+    const req = http.get(`http://${ORCHESTRATOR_HOST}:${ORCHESTRATOR_PORT}/api/status`, { timeout: 10000 }, (res) => {
+      let data = '';
+      res.on('data', d => { data += d; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
 
 function br() { return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); }
 function now() { return new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }); }
 
-// ─── Parse last 24h of health logs ───────────────────────────────────────────
-
-function parseLogs() {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const stats = {
-    total_checks: 0,
-    online_checks: 0,
-    offline_checks: 0,
-    latencies: [],
-    cpu_values: [],
-    mem_values: [],
-    alerts: [],
-    containers_down: [],
-    platform_downs: [],
-  };
-
-  try {
-    const lines = fs.readFileSync(LOG_FILE, 'utf8').split('\n').filter(Boolean);
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        if (new Date(entry.timestamp).getTime() < cutoff) continue;
-        stats.total_checks++;
-        if (entry.message === 'Platform OK') {
-          stats.online_checks++;
-          if (entry.latency_ms) stats.latencies.push(entry.latency_ms);
-        }
-        if (entry.message === 'Platform is DOWN' || entry.message === 'Platform still DOWN') {
-          stats.offline_checks++;
-          stats.platform_downs.push(entry.timestamp);
-        }
-        if (entry.cpu_percent) stats.cpu_values.push(entry.cpu_percent);
-        if (entry.mem_percent) stats.mem_values.push(entry.mem_percent);
-        if (entry.level === 'CRITICAL' || entry.level === 'WARNING') {
-          stats.alerts.push({ level: entry.level, message: entry.message, time: entry.timestamp });
-        }
-      } catch { /* skip malformed lines */ }
-    }
-  } catch { /* log not yet created */ }
-
-  return stats;
-}
-
 function avg(arr) { return arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0; }
 function max(arr) { return arr.length ? Math.max(...arr) : 0; }
 
-// ─── Get pending dev actions ──────────────────────────────────────────────────
-
 function getPendingActions() {
-  try {
-    const data = JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8'));
-    return data.pending || [];
-  } catch { return []; }
-}
-
-// ─── Current system state ─────────────────────────────────────────────────────
-
-async function getCurrentState() {
-  const state = {};
-  try {
-    const { stdout: psOut } = await execAsync('docker ps --format "{{.Names}}|{{.Status}}" 2>/dev/null');
-    const containers = {};
-    psOut.trim().split('\n').forEach((l) => {
-      const [n, s] = l.split('|');
-      if (n) containers[n.trim()] = s ? s.trim() : 'unknown';
-    });
-    state.scartrack_app = containers['scartrack_app'] || 'stopped';
-    state.scartrack_db  = containers['scartrack_db']  || 'stopped';
-  } catch { state.scartrack_app = 'unknown'; state.scartrack_db = 'unknown'; }
-
-  try {
-    const { stdout } = await execAsync("free | grep Mem | awk '{print int($3/$2*100)}'");
-    state.memory = parseInt(stdout.trim()) || 0;
-  } catch { state.memory = 0; }
-
-  try {
-    const { stdout } = await execAsync("df / | tail -1 | awk '{print int($5)}'");
-    state.disk = parseInt(stdout.trim()) || 0;
-  } catch { state.disk = 0; }
-
-  return state;
+  try { return JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8')).pending || []; }
+  catch { return []; }
 }
 
 // ─── Build Report ─────────────────────────────────────────────────────────────
 
 async function buildReport() {
-  const stats  = parseLogs();
-  const cur    = await getCurrentState();
+  // Fetch real data from orchestrator API (works from inside Docker)
+  const status  = await fetchStatus();
   const pending = getPendingActions();
 
-  const uptime = stats.total_checks > 0
-    ? Math.round((stats.online_checks / stats.total_checks) * 100)
-    : 0;
+  // Fallback values if orchestrator unreachable
+  const platform   = status?.platform   || { status: 'unknown', latency_ms: 0 };
+  const containers = status?.containers || {};
+  const system     = status?.system     || { memory_percent: 0, disk_percent: 0 };
+  const hStats     = status?.health_stats || { total: 0, online: 0, alerts: [] };
 
-  const platformStatus = cur.scartrack_app && cur.scartrack_app.startsWith('Up') ? '🟢 ONLINE' : '🔴 OFFLINE';
-  const appStatus  = cur.scartrack_app.startsWith('Up') ? '🟢 running' : `🔴 ${cur.scartrack_app}`;
-  const dbStatus   = cur.scartrack_db.startsWith('Up')  ? '🟢 running' : `🔴 ${cur.scartrack_db}`;
+  const uptime = hStats.total > 0 ? Math.round((hStats.online / hStats.total) * 100) : (platform.status === 'online' ? 100 : 0);
+  const appStatus = (containers['scartrack_app'] || 'unknown').startsWith('Up') ? '🟢 running' : `🔴 ${containers['scartrack_app'] || 'unknown'}`;
+  const dbStatus  = (containers['scartrack_db']  || 'unknown').startsWith('Up') ? '🟢 running' : `🔴 ${containers['scartrack_db']  || 'unknown'}`;
+  const platformStatus = platform.status === 'online' ? '🟢 ONLINE' : platform.status === 'offline' ? '🔴 OFFLINE' : '🟡 DEGRADED';
 
-  const criticalAlerts = stats.alerts.filter(a => a.level === 'CRITICAL');
-  const warningAlerts  = stats.alerts.filter(a => a.level === 'WARNING');
-
-  const alertsSection = stats.alerts.length === 0
+  const criticalAlerts = (hStats.alerts || []).filter(a => a.level === 'CRITICAL');
+  const warningAlerts  = (hStats.alerts || []).filter(a => a.level === 'WARNING');
+  const alertsSection  = hStats.alerts.length === 0
     ? '   Nenhum alerta nas últimas 24h ✅'
     : [
         criticalAlerts.length ? `   🔴 Críticos: ${criticalAlerts.length}` : '',
-        warningAlerts.length  ? `   🟡 Avisos: ${warningAlerts.length}`    : '',
+        warningAlerts.length  ? `   🟡 Avisos: ${warningAlerts.length}` : '',
         criticalAlerts.slice(0, 3).map(a => `   • ${a.message} (${new Date(a.time).toLocaleTimeString('pt-BR')})`).join('\n'),
       ].filter(Boolean).join('\n');
 
@@ -136,13 +79,13 @@ async function buildReport() {
 ─── SAÚDE DA PLATAFORMA ───
 ${platformStatus}
 ⏱️ Uptime 24h: ${uptime}%
-⚡ Latência média: ${avg(stats.latencies)}ms | Pico: ${max(stats.latencies)}ms
-🔍 Verificações realizadas: ${stats.total_checks}
+⚡ Latência: ${platform.latency_ms || 0}ms
+🔍 Verificações realizadas: ${hStats.total}
 
 ─── CONTAINERS ───
 📦 scartrack_app: ${appStatus}
 📦 scartrack_db:  ${dbStatus}
-💾 Disco: ${cur.disk}% | 🧠 RAM: ${cur.memory}%
+💾 Disco: ${system.disk_percent}% | 🧠 RAM: ${system.memory_percent}%
 
 ─── ALERTAS (últimas 24h) ───
 ${alertsSection}
@@ -152,7 +95,7 @@ ${pendingSection}
 
 ─── PRIORIDADES DE HOJE ───
 ${uptime < 99 ? '   🔴 Investigar causa de instabilidade' : '   ✅ Plataforma estável — manutenção preventiva'}
-${cur.disk > 70 ? `   ⚠️ Disco em ${cur.disk}% — monitorar crescimento` : ''}
+${system.disk_percent > 70 ? `   ⚠️ Disco em ${system.disk_percent}% — monitorar crescimento` : ''}
 ${pending.length > 0 ? `   💡 Revisar ${pending.length} sugestão(ões) do Dev_Agent` : ''}
 
 ─── NOTA DO CEO ───

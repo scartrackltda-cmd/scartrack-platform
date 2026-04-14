@@ -4,7 +4,7 @@
  * Também processa webhooks do Telegram e WhatsApp para autorização de ações
  */
 
-require('dotenv').config({ path: '/root/scartrack-agency/.env' });
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
@@ -243,6 +243,71 @@ app.get('/api/actions/log', (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', agent: 'CEO_Scartrack Orchestrator', timestamp: new Date().toISOString() });
+});
+
+// ─── Full Status API (used by daily-report inside Docker) ─────────────────────
+app.get('/api/status', async (req, res) => {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+
+  const result = { timestamp: new Date().toISOString(), containers: {}, system: {}, platform: {}, pending_actions: 0 };
+
+  // Containers
+  try {
+    const { stdout } = await execAsync('docker ps --format "{{.Names}}|{{.Status}}" 2>/dev/null');
+    stdout.trim().split('\n').forEach(line => {
+      const [name, status] = line.split('|');
+      if (name) result.containers[name.trim()] = status ? status.trim() : 'unknown';
+    });
+  } catch { result.containers.error = 'docker unavailable'; }
+
+  // System
+  try {
+    const { stdout: mem } = await execAsync("free | grep Mem | awk '{print int($3/$2*100)}'");
+    result.system.memory_percent = parseInt(mem.trim()) || 0;
+  } catch { result.system.memory_percent = 0; }
+  try {
+    const { stdout: disk } = await execAsync("df / | tail -1 | awk '{print int($5)}'");
+    result.system.disk_percent = parseInt(disk.trim()) || 0;
+  } catch { result.system.disk_percent = 0; }
+
+  // Platform HTTP check
+  try {
+    const start = Date.now();
+    await new Promise((resolve, reject) => {
+      const req2 = http.get('http://187.127.18.17:3002/api/health', { timeout: 8000 }, r => { r.resume(); resolve(r.statusCode); });
+      req2.on('error', reject);
+      req2.on('timeout', () => { req2.destroy(); reject(new Error('timeout')); });
+    }).then(code => {
+      result.platform = { status: code < 400 ? 'online' : 'degraded', http_code: code, latency_ms: Date.now() - start };
+    });
+  } catch {
+    result.platform = { status: 'offline', http_code: 0, latency_ms: 0 };
+  }
+
+  // Health log stats (last 24h)
+  const LOG_FILE = '/var/log/scartrack-health.log';
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const stats = { total: 0, online: 0, alerts: [] };
+  try {
+    const lines = require('fs').readFileSync(LOG_FILE, 'utf8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const e = JSON.parse(line);
+        if (new Date(e.timestamp).getTime() < cutoff) continue;
+        stats.total++;
+        if (e.message === 'Platform OK') stats.online++;
+        if (e.level === 'CRITICAL' || e.level === 'WARNING') stats.alerts.push({ level: e.level, message: e.message, time: e.timestamp });
+      } catch { /* skip */ }
+    }
+  } catch { /* log not yet created */ }
+  result.health_stats = stats;
+
+  // Pending actions
+  try { result.pending_actions = (loadPending().pending || []).length; } catch { result.pending_actions = 0; }
+
+  res.json(result);
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
