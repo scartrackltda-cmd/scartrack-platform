@@ -1,0 +1,27 @@
+{
+  "telegram": {
+    "bot_token": "${TELEGRAM_BOT_TOKEN}",
+    "chat_id": "${TELEGRAM_CHAT_ID}",
+    "parse_mode": "Markdown",
+    "disable_web_page_preview": true
+  },
+  "alert_templates": {
+    "platform_down": "🚨 *ALERTA CRÍTICO — Scartrack*\n\n❌ Plataforma FORA DO AR\n🔗 `http://187.127.18.17:3002`\n🕐 `{timestamp}`\n📊 Status: `{status_code}`\n\n_Monitoring\\_Agent detectou a queda\\._",
+    "platform_up": "✅ *Scartrack — Plataforma Restaurada*\n\n🟢 Online novamente\n🕐 `{timestamp}`\n⏱️ Indisponível por: `{downtime}`",
+    "container_down": "⚠️ *Container Parado*\n\n📦 `{container_name}`\n🔴 Status: `{status}`\n🕐 `{timestamp}`",
+    "db_unreachable": "🔴 *Banco Inacessível*\n\n🗄️ PostgreSQL indisponível\n🕐 `{timestamp}`",
+    "daily_report": "📊 *Relatório Diário — Scartrack Agency*\n🗓️ `{date}`\n\n{report_content}",
+    "dev_suggestion": "💡 *Dev\\_Agent — Sugestão*\n\n📌 *{title}*\n\n{description}\n\nResponda /autorizo ou /cancela",
+    "auth_required": "🔐 *Autorização Necessária*\n\nAção: `{action}`\n\nResponda /autorizo ou /cancela",
+    "action_completed": "✅ *Ação Concluída*\n\n{action_description}\n🕐 `{timestamp}`",
+    "high_cpu": "⚠️ *CPU Elevada*\n\n📈 `{cpu_percent}%` em `{timestamp}`",
+    "high_memory": "⚠️ *Memória Elevada*\n\n🧠 `{memory_percent}%` em `{timestamp}`"
+  },
+  "commands": {
+    "/status": "Solicita status completo ao Monitoring_Agent",
+    "/relatorio": "Gera relatório diário antecipado",
+    "/autorizo": "Autoriza ação pendente do Dev_Agent",
+    "/cancela": "Cancela ação pendente do Dev_Agent",
+    "/ajuda": "Lista todos os comandos disponíveis"
+  }
+}

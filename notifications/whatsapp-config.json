@@ -1,0 +1,26 @@
+{
+  "evolution_api": {
+    "base_url": "http://187.127.18.17:43654",
+    "api_key": "q6bOgsmWkvMTh4Cz7odqKqa2CG2KFia6",
+    "instance": "SCARTRACK",
+    "owner_number": "5541991281716",
+    "manager_url": "http://187.127.18.17:43654/manager/login"
+  },
+  "endpoints": {
+    "send_text": "/message/sendText/SCARTRACK",
+    "send_media": "/message/sendMedia/SCARTRACK",
+    "instance_status": "/instance/connectionState/SCARTRACK"
+  },
+  "alert_templates": {
+    "platform_down": "🚨 *ALERTA CRÍTICO — Scartrack*\n\n❌ Plataforma FORA DO AR\n🔗 URL: http://187.127.18.17:3002\n🕐 Horário: {timestamp}\n📊 Status: {status_code}\n\n_Monitoring_Agent detectou a queda. Verificar imediatamente._",
+    "platform_up": "✅ *Scartrack — Plataforma Restaurada*\n\n🟢 Plataforma voltou ao ar\n🕐 Horário: {timestamp}\n⏱️ Tempo de indisponibilidade: {downtime}\n\n_Sistema normalizado._",
+    "container_down": "⚠️ *Container Parado — Scartrack*\n\n📦 Container: {container_name}\n🔴 Status: {status}\n🕐 Horário: {timestamp}\n\n_Ação necessária._",
+    "db_unreachable": "🔴 *Banco de Dados Inacessível*\n\n🗄️ PostgreSQL/PostGIS indisponível\n🕐 Horário: {timestamp}\n\n_Verifique o container scartrack_db imediatamente._",
+    "daily_report": "📊 *Relatório Diário — Scartrack Agency*\n🗓️ {date}\n\n{report_content}\n\n_CEO_Scartrack — Gerado automaticamente às 07:00_",
+    "dev_suggestion": "💡 *Dev_Agent — Sugestão de Melhoria*\n\n📌 {title}\n\n{description}\n\n_Para autorizar, responda: 'autorizo'\nPara cancelar, responda: 'cancela'_",
+    "auth_required": "🔐 *Autorização Necessária*\n\nO Dev_Agent solicita autorização para:\n\n📋 {action}\n\n_Responda 'autorizo' para prosseguir ou 'cancela' para abortar._",
+    "action_completed": "✅ *Ação Concluída*\n\n{action_description}\n\n🕐 Concluído em: {timestamp}",
+    "high_cpu": "⚠️ *Alto Consumo de CPU*\n\n📈 CPU: {cpu_percent}%\n🕐 {timestamp}\n\n_Monitorando..._",
+    "high_memory": "⚠️ *Alto Consumo de Memória*\n\n🧠 Memória: {memory_percent}%\n🕐 {timestamp}\n\n_Monitorando..._"
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "openclaw": {
+    "base_url": "http://187.127.18.17:48627",
+    "project": "openclaw-h2oa",
+    "project_name": "Scartrack Agency"
+  },
+  "llm": {
+    "provider": "groq",
+    "model": "llama-3.3-70b-versatile",
+    "fallback_model": "llama-3.1-8b-instant",
+    "settings": {
+      "default_temperature": 0.2,
+      "max_tokens": 4096,
+      "top_p": 0.9,
+      "stream": true
+    }
+  },
+  "agents": [
+    {
+      "id": "ceo_scartrack",
+      "name": "CEO_Scartrack",
+      "role": "manager",
+      "description": "Coordena todos os agentes, consolida relatórios e notifica o dono diariamente",
+      "prompt_file": "agents/01-ceo-scartrack.md",
+      "temperature": 0.3,
+      "max_tokens": 2048,
+      "triggers": ["daily_report", "alert_critical", "agent_handoff"],
+      "priority": 1,
+      "active": true,
+      "schedule": {
+        "daily_report": "0 7 * * *",
+        "weekly_summary": "0 8 * * 1"
+      },
+      "manages": ["monitoring_agent", "dev_agent"]
+    },
+    {
+      "id": "monitoring_agent",
+      "name": "Monitoring_Agent",
+      "role": "monitor",
+      "description": "Monitora 24/7 a plataforma Scartrack, containers Docker, banco de dados e performance",
+      "prompt_file": "agents/02-monitoring-agent.md",
+      "temperature": 0.1,
+      "max_tokens": 1024,
+      "triggers": ["cron_health_check", "alert_trigger", "manual_check"],
+      "priority": 2,
+      "active": true,
+      "schedule": {
+        "health_check": "*/5 * * * *",
+        "deep_check": "0 * * * *",
+        "daily_report": "0 6 * * *"
+      },
+      "targets": {
+        "platform_url": "http://187.127.18.17:3002",
+        "api_health": "http://187.127.18.17:3002/api/health",
+        "containers": ["scartrack_app", "scartrack_db"],
+        "db_host": "127.0.0.1",
+        "db_port": 5432,
+        "db_name": "scartrackdb"
+      }
+    },
+    {
+      "id": "dev_agent",
+      "name": "Dev_Agent",
+      "role": "developer",
+      "description": "Analisa o código, sugere melhorias e implementa novas funcionalidades — apenas com autorização explícita do dono",
+      "prompt_file": "agents/03-dev-agent.md",
+      "temperature": 0.2,
+      "max_tokens": 4096,
+      "triggers": ["improvement_request", "bug_report", "authorized_deploy"],
+      "priority": 3,
+      "active": true,
+      "requires_authorization": true,
+      "access": {
+        "github_repo": "https://github.com/scartrackltda-cmd/scartrack-platform.git",
+        "local_path": "/root/scartrack-platform",
+        "docker_compose": "/root/scartrack-platform/docker-compose.yml",
+        "prisma_schema": "/root/scartrack-platform/prisma/schema.prisma"
+      }
+    }
+  ],
+  "routing_rules": {
+    "default_agent": "ceo_scartrack",
+    "keywords": {
+      "status|online|offline|down|fora do ar|plataforma": "monitoring_agent",
+      "docker|container|banco|db|database|memória|cpu|performance": "monitoring_agent",
+      "código|bug|feature|melhoria|implementar|deploy|prisma|migrate": "dev_agent",
+      "relatório|resumo|sumário|overview|hoje": "ceo_scartrack"
+    }
+  },
+  "notification_channels": {
+    "whatsapp": {
+      "enabled": true,
+      "config_file": "notifications/whatsapp-config.json",
+      "recipient": "+5541991281716",
+      "instance": "SCARTRACK"
+    },
+    "telegram": {
+      "enabled": true,
+      "config_file": "notifications/telegram-config.json"
+    }
+  },
+  "authorization": {
+    "owner_whatsapp": "+5541991281716",
+    "authorization_keywords": ["autorizo", "pode fazer", "pode executar", "go ahead", "sim pode", "confirmo"],
+    "denial_keywords": ["não autorizo", "cancela", "para", "abort", "não pode"],
+    "pending_actions_file": "orchestrator/pending-actions.json"
+  }
+}
