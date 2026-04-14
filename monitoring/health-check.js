@@ -5,7 +5,7 @@
  * Executado via cron: every-5-min node /root/scartrack-agency/monitoring/health-check.js
  */
 
-require('dotenv').config({ path: '/root/scartrack-agency/.env' });
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const http  = require('http');
 const { exec } = require('child_process');
 const { promisify } = require('util');

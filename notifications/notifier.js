@@ -3,7 +3,7 @@
  * Sends alerts to WhatsApp (Evolution API) and Telegram simultaneously
  */
 
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const https = require('https');
 const http = require('http');
 

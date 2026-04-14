@@ -5,7 +5,7 @@
  * Cron: 0 7 * * * node /root/scartrack-agency/monitoring/daily-report.js
  */
 
-require('dotenv').config({ path: '/root/scartrack-agency/.env' });
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const fs   = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
